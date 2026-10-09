@@ -65,6 +65,13 @@ func (r *Rotator) Write(p []byte) (n int, err error) {
 	return n, err
 }
 
+// Rotate manually triggers a log rotation.
+func (r *Rotator) Rotate() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.rotate()
+}
+
 func (r *Rotator) rotate() error {
 	r.file.Close()
 	

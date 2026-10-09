@@ -53,3 +53,34 @@ func TestRotation(t *testing.T) {
 		t.Error("Expected rotated log files to be compressed with gzip")
 	}
 }
+
+func TestManualRotation(t *testing.T) {
+	filename := "manual_test.log"
+	defer os.Remove(filename)
+	defer os.RemoveAll("manual_test.log.*")
+
+	r, err := NewRotator(filename, 1024, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	_, _ = r.Write([]byte("some data"))
+
+	if err := r.Rotate(); err != nil {
+		t.Fatalf("Manual rotate failed: %v", err)
+	}
+
+	files, _ := os.ReadDir(".")
+	foundBackup := false
+	for _, f := range files {
+		if f.Name() != filename && strings.HasPrefix(f.Name(), "manual_test.log.") {
+			foundBackup = true
+			break
+		}
+	}
+
+	if !foundBackup {
+		t.Error("Expected a backup file after manual rotation")
+	}
+}
