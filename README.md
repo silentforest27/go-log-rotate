@@ -5,7 +5,8 @@
 ## Usage
 
 ```go
-rotator, err := logrotate.NewRotator("app.log", 10*1024*1024) // 10MB
+// Filename, max size (10MB), max backup files (5)
+rotator, err := logrotate.NewRotator("app.log", 10*1024*1024, 5)
 if err != nil {
     log.Fatal(err)
 }

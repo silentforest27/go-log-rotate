@@ -10,35 +10,33 @@ func TestRotation(t *testing.T) {
 	defer os.Remove(filename)
 	defer os.RemoveAll("test.log.*")
 
-	// Max size 10 bytes to trigger rotation quickly
-	r, err := NewRotator(filename, 10)
+	// Max size 10 bytes, max backups 2
+	r, err := NewRotator(filename, 10, 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer r.Close()
 
-	// First write: fits in limit
-	_, err = r.Write([]byte("hello"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Second write: triggers rotation
-	_, err = r.Write([]byte(" world this is long"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	files, _ := os.ReadDir(".")
-	foundBackup := false
-	for _, f := range files {
-		if f.Name() != filename && len(f.Name()) > 8 && f.Name()[:8] == "test.log" {
-			foundBackup = true
-			break
+	// Trigger multiple rotations
+	for i := 0; i < 5; i++ {
+		_, err = r.Write([]byte("this is a long string"))
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 
-	if !foundBackup {
-		t.Error("Expected rotated log file to be created")
+	files, _ := os.ReadDir(".")
+	backupCount := 0
+	for _, f := range files {
+		if f.Name() != filename && len(f.Name()) > 8 && f.Name()[:8] == "test.log" {
+			backupCount++
+		}
+	}
+
+	if backupCount > 2 {
+		t.Errorf("Expected at most 2 backup files, found %d", backupCount)
+	}
+	if backupCount == 0 {
+		t.Error("Expected rotated log files to be created")
 	}
 }
