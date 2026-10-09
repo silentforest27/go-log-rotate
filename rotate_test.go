@@ -2,6 +2,7 @@ package logrotate
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -28,7 +29,7 @@ func TestRotation(t *testing.T) {
 	files, _ := os.ReadDir(".")
 	backupCount := 0
 	for _, f := range files {
-		if f.Name() != filename && len(f.Name()) > 8 && f.Name()[:8] == "test.log" {
+		if f.Name() != filename && strings.HasPrefix(f.Name(), "test.log.") {
 			backupCount++
 		}
 	}
@@ -38,5 +39,17 @@ func TestRotation(t *testing.T) {
 	}
 	if backupCount == 0 {
 		t.Error("Expected rotated log files to be created")
+	}
+
+	// Verify at least one file is gzipped
+	foundGzip := false
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".gz") {
+			foundGzip = true
+			break
+		}
+	}
+	if !foundGzip {
+		t.Error("Expected rotated log files to be compressed with gzip")
 	}
 }

@@ -1,7 +1,9 @@
 package logrotate
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -71,13 +73,45 @@ func (r *Rotator) rotate() error {
 		return err
 	}
 	
+	// Compress the rotated file
+	if err := r.compress(backupName); err != nil {
+		// If compression fails, we keep the uncompressed backup to avoid data loss
+		fmt.Fprintf(os.Stderr, "failed to compress log file %s: %v\n", backupName, err)
+	}
+	
 	if err := r.prune(); err != nil {
-		// Pruning failure shouldn't stop logging, but we log it or return it
-		// For this library, we'll return it to let the user decide
 		return err
 	}
 	
 	return r.open()
+}
+
+func (r *Rotator) compress(src string) error {
+	input, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer input.Close()
+
+	outputName := src + ".gz"
+	output, err := os.Create(outputName)
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+
+	gzipWriter := gzip.NewWriter(output)
+	if _, err := io.Copy(gzipWriter, input); err != nil {
+		gzipWriter.Close()
+		return err
+	}
+	
+	if err := gzipWriter.Close(); err != nil {
+		return err
+	}
+
+	// Remove the original uncompressed backup
+	return os.Remove(src)
 }
 
 func (r *Rotator) prune() error {
