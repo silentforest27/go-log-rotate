@@ -17,6 +17,7 @@ type Rotator struct {
 	filename    string
 	maxSize     int64
 	maxBackups  int
+	compress    bool
 	currentSize int64
 	file        *os.File
 	mu          sync.Mutex
@@ -28,11 +29,26 @@ func NewRotator(filename string, maxSize int64, maxBackups int) (*Rotator, error
 		filename:   filename,
 		maxSize:    maxSize,
 		maxBackups:  maxBackups,
+		compress:    true, // default to true
 	}
 	if err := r.open(); err != nil {
 		return nil, err
 	}
 	return r, nil
+}
+
+// SetCompress toggles gzip compression for rotated logs.
+func (r *Rotator) SetCompress(compress bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.compress = compress
+}
+
+// Size returns the current size of the active log file.
+func (r *Rotator) Size() int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.currentSize
 }
 
 func (r *Rotator) open() error {
@@ -80,10 +96,12 @@ func (r *Rotator) rotate() error {
 		return err
 	}
 	
-	// Compress the rotated file
-	if err := r.compress(backupName); err != nil {
-		// If compression fails, we keep the uncompressed backup to avoid data loss
-		fmt.Fprintf(os.Stderr, "failed to compress log file %s: %v\n", backupName, err)
+	// Compress the rotated file if enabled
+	if r.compress {
+		if err := r.compressFile(backupName); err != nil {
+			// If compression fails, we keep the uncompressed backup to avoid data loss
+			fmt.Fprintf(os.Stderr, "failed to compress log file %s: %v\n", backupName, err)
+		}
 	}
 	
 	if err := r.prune(); err != nil {
@@ -93,7 +111,7 @@ func (r *Rotator) rotate() error {
 	return r.open()
 }
 
-func (r *Rotator) compress(src string) error {
+func (r *Rotator) compressFile(src string) error {
 	input, err := os.Open(src)
 	if err != nil {
 		return err

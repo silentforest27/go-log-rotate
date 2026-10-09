@@ -84,3 +84,44 @@ func TestManualRotation(t *testing.T) {
 		t.Error("Expected a backup file after manual rotation")
 	}
 }
+
+func TestDisableCompression(t *testing.T) {
+	filename := "no_comp.log"
+	defer os.Remove(filename)
+	defer os.RemoveAll("no_comp.log.*")
+
+	r, err := NewRotator(filename, 10, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	r.SetCompress(false)
+	_, _ = r.Write([]byte("this string is long"))
+
+	files, _ := os.ReadDir(".")
+	for _, f := range files {
+		if strings.HasSuffix(f.Name(), ".gz") && strings.HasPrefix(f.Name(), "no_comp.log") {
+			t.Errorf("Expected no gzipped files when compression is disabled, found %s", f.Name())
+		}
+	}
+}
+
+func TestSizeMethod(t *testing.T) {
+	filename := "size_test.log"
+	defer os.Remove(filename)
+	defer os.RemoveAll("size_test.log.*")
+
+	r, err := NewRotator(filename, 1024, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+
+	data := []byte("hello")
+	_, _ = r.Write(data)
+
+	if r.Size() != int64(len(data)) {
+		t.Errorf("Expected size %d, got %d", len(data), r.Size())
+	}
+}
